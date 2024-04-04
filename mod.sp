@@ -1,6 +1,6 @@
 mod "guardrails_insights" {
   # Hub metadata
-  title         = "Turbot Guardrails Insights"
+  title         = "Turbot Guardrails Insights - WIP"
   description   = "Create dashboards and reports for your Turbot Guardrails resources using Powerpipe and Steampipe."
   color         = "#FCC119"
   documentation = file("./docs/index.md")
