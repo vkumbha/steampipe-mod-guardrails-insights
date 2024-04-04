@@ -1,4 +1,4 @@
-mod "guardrails_insights" {
+mod "guardrails_insights_wip" {
   # Hub metadata
   title         = "Turbot Guardrails Insights - WIP"
   description   = "Create dashboards and reports for your Turbot Guardrails resources using Powerpipe and Steampipe."
