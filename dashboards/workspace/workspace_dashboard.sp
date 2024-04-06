@@ -10,49 +10,67 @@ dashboard "workspace_dashboard" {
 
   # Analysis
   container {
-    title = "Workspace Statistics"
+    # title = "Workspace Statistics"
 
     card {
-      sql   = query.workspace_count.sql
-      width = 3
+      sql   = query.workspaces_count.sql
+      width = 2
       href  = dashboard.workspace_report.url_path
     }
 
     card {
-      sql   = query.workspace_account_count.sql
-      width = 3
+      sql   = query.accounts_count.sql
+      width = 2
       href  = dashboard.workspace_account_report.url_path
+    }
+
+    card {
+      sql   = query.resources_count.sql
+      width = 2
+    }
+
+    card {
+      sql   = query.active_controls_count.sql
+      width = 2
     }
   }
 
   # Analysis
   container {
-    title = "Account Statistics"
+    # title = "Account Statistics"
 
     chart {
       type  = "donut"
       title = "Accounts by Workspace"
-      width = 4
+      width = 3
       sql   = query.accounts_by_workspace.sql
     }
 
     chart {
       type  = "donut"
       title = "Accounts by Provider"
-      width = 4
+      width = 3
       sql   = query.accounts_by_provider.sql
     }
 
     chart {
-      type  = "line"
-      title = "Cumulative Account Imports by Month"
-      width = 4
-      sql   = query.cumulative_account_imports_by_month.sql
+      type  = "donut"
+      title = "Resources by Workspace"
+      width = 3
+      sql   = query.resources_by_workspace.sql
     }
+
+    chart {
+      type  = "donut"
+      title = "Active Controls by Workspace"
+      width = 3
+      sql   = query.active_controls_by_workspace.sql
+    }
+
   }
 }
 
-query "workspace_count" {
+query "workspaces_count" {
   sql = <<-EOQ
     select
       count(workspace) as "Workspaces"
@@ -63,7 +81,7 @@ query "workspace_count" {
   EOQ
 }
 
-query "workspace_account_count" {
+query "accounts_count" {
   sql = <<-EOQ
   select
     sum((output -> 'accounts' -> 'metadata' -> 'stats' ->> 'total')::int) as "Accounts"
@@ -72,6 +90,46 @@ query "workspace_account_count" {
   where
     query = '{
       accounts: resources(filter: "resourceTypeId:tmod:@turbot/turbot#/resource/interfaces/accountable level:self") {
+        metadata {
+          stats {
+            total
+          }
+        }
+      }
+    }'
+  EOQ
+}
+
+query "resources_count" {
+  sql = <<-EOQ
+  select
+    sum((output -> 'resources' -> 'metadata' -> 'stats' ->> 'total')::int) as "Resources"
+  from
+    guardrails_query
+  where
+    query = '{
+      resources: resources(filter: "resourceTypeId:tmod:@turbot/aws#/resource/types/aws,tmod:@turbot/azure#/resource/types/azure,tmod:@turbot/gcp#/resource/types/gcp") {
+        metadata {
+          stats {
+            total
+          }
+        }
+      }
+    }'
+  EOQ
+}
+
+query "active_controls_count" {
+  sql = <<-EOQ
+  select
+    sum((output -> 'active_controls' -> 'metadata' -> 'stats' ->> 'total')::int) as "Active Controls"
+  from
+    guardrails_query
+  where
+    query = '{
+      active_controls: controls(
+        filter: "state:active resourceTypeId:tmod:@turbot/aws#/resource/types/aws,tmod:@turbot/azure#/resource/types/azure,tmod:@turbot/gcp#/resource/types/gcp"
+      ) {
         metadata {
           stats {
             total
@@ -128,27 +186,46 @@ query "accounts_by_provider" {
     EOQ
 }
 
-query "cumulative_account_imports_by_month" {
+query "active_controls_by_workspace" {
   sql = <<-EOQ
-    with data as (
-      with months as 
-      (
-        select to_char((create_timestamp)::date, 'YYYY-MM') AS month from guardrails_resource where filter ='resourceTypeId:tmod:@turbot/turbot#/resource/interfaces/accountable level:self'
-      )
-      select month,count(*) from months where 
-        month <= (
-          select
-            to_char(now(), 'YYYY-MM')
-        )
-      group by
-        month
-    )
-    select month,sum(count) over  (
-        order by
-          month asc rows between unbounded preceding
-          and current row
-      )
-    from
-      data
+  select
+    _ctx ->> 'connection_name' as "Connection Name",
+    sum((output -> 'total_controls' -> 'metadata' -> 'stats' ->> 'total')::int) as "Active Controls"
+  from
+    guardrails_query
+  where
+    query = '{
+      total_controls: controls(filter: "state:active resourceTypeId:tmod:@turbot/aws#/resource/types/aws,tmod:@turbot/azure#/resource/types/azure,tmod:@turbot/gcp#/resource/types/gcp") {
+        metadata {
+          stats {
+            total
+          }
+        }
+      }
+    }'
+  group by
+    _ctx ->> 'connection_name'
+  EOQ
+}
+
+query "resources_by_workspace" {
+  sql = <<-EOQ
+  select
+    _ctx ->> 'connection_name' as "Connection Name",
+    sum((output -> 'accounts' -> 'metadata' -> 'stats' ->> 'total')::int) as "Resources"
+  from
+    guardrails_query
+  where
+    query = '{
+      accounts: resources(filter: "resourceTypeId:tmod:@turbot/aws#/resource/types/aws,tmod:@turbot/azure#/resource/types/azure,tmod:@turbot/gcp#/resource/types/gcp") {
+        metadata {
+          stats {
+            total
+          }
+        }
+      }
+    }'
+  group by
+    _ctx ->> 'connection_name'
   EOQ
 }

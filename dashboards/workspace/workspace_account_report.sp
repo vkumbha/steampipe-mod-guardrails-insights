@@ -10,29 +10,32 @@ dashboard "workspace_account_report" {
 
   # Analysis
   container {
-    text {
-      value = "List of accounts across workspaces. Click on the resource to navigate to the respective Turbot Guardrails Console."
+
+    card {
+      sql   = query.workspaces_count.sql
+      width = 3
+      href  = dashboard.workspace_report.url_path
     }
 
     card {
-      sql   = query.workspace_account_count.sql
+      sql   = query.accounts_count.sql
       width = 3
     }
 
-    card {
-      sql   = query.workspace_aws_count.sql
-      width = 3
-    }
+    # card {
+    #   sql   = query.workspace_aws_count.sql
+    #   width = 3
+    # }
 
-    card {
-      sql   = query.workspace_azure_count.sql
-      width = 3
-    }
+    # card {
+    #   sql   = query.workspace_azure_count.sql
+    #   width = 3
+    # }
 
-    card {
-      sql   = query.workspace_gcp_count.sql
-      width = 3
-    }
+    # card {
+    #   sql   = query.workspace_gcp_count.sql
+    #   width = 3
+    # }
 
     table {
       column "id" {
@@ -43,33 +46,44 @@ dashboard "workspace_account_report" {
         display = "none"
       }
 
-      column "Account ID" {
+      column "External ID" {
         href = <<-EOT
           {{ .'Workspace' }}/apollo/resources/{{.'id' | @uri}}/detail
         EOT
       }
+
+      column "Resources" {
+        href = <<-EOT
+          {{ .'Workspace' }}/apollo/resources/{{.'id' | @uri}}/reports
+        EOT
+      }
+
+      column "Policy Settings" {
+        href = <<-EOT
+          {{ .'Workspace' }}/apollo/reports/policy-settings-by-resource?filter=resourceId%3A%27{{.'id' | @uri}}%27
+        EOT
+      }
+
+      column "Alerts" {
+        href = <<-EOT
+          {{ .'Workspace' }}/apollo/reports/alerts-by-control-type?filter=resourceId%3A%27{{.'id' | @uri}}%27
+        EOT
+      }
+
+      column "Active Controls" {
+        href = <<-EOT
+          {{ .'Workspace' }}/apollo/reports/controls-by-resource?filter=resourceId%3A%27{{.'id' | @uri}}%27+state%3Aactive
+        EOT
+      }
+
+      column "Total Controls" {
+        href = <<-EOT
+          {{ .'Workspace' }}/apollo/reports/controls-by-resource?filter=resourceId%3A%27{{.'id' | @uri}}%27
+        EOT
+      }
+
       sql = query.workspace_account_detail.sql
     }
-
-    table {
-      title = "Accounts Summary (limited to 5000)"
-      column "id" {
-        display = "none"
-      }
-
-      column "workspace" {
-        display = "none"
-      }
-
-      column "Account ID" {
-        href = <<-EOT
-          {{ .'Workspace' }}/apollo/resources/{{.'id' | @uri}}/detail
-        EOT
-      }
-      sql = query.workspace_account_detail_extras.sql
-
-    }
-
 
   }
 }
@@ -109,36 +123,6 @@ query "workspace_gcp_count" {
 
 query "workspace_account_detail" {
   sql = <<-EOQ
-    select
-      id,
-      workspace as "Workspace",
-      case
-        when resource_type_uri = 'tmod:@turbot/aws#/resource/types/account' then data ->> 'Id'
-        when resource_type_uri = 'tmod:@turbot/azure#/resource/types/subscription' then data ->> 'subscriptionId'
-        when resource_type_uri = 'tmod:@turbot/gcp#/resource/types/project' then data ->> 'projectId'
-      end as "Account ID",
-      case
-        when resource_type_uri = 'tmod:@turbot/aws#/resource/types/account' then data ->> 'AccountAlias'
-        when resource_type_uri = 'tmod:@turbot/azure#/resource/types/subscription' then data ->> 'displayName'
-        when resource_type_uri = 'tmod:@turbot/gcp#/resource/types/project' then data ->> 'name'
-      end as "Account Name",
-      trunk_title as "Trunk Title"
-    from
-      guardrails_resource
-    where
-      resource_type_uri in (
-        'tmod:@turbot/aws#/resource/types/account',
-        'tmod:@turbot/azure#/resource/types/subscription',
-        'tmod:@turbot/gcp#/resource/types/project'
-      )
-    order by
-      "Workspace",
-      "Trunk Title";
-  EOQ
-}
-
-query "workspace_account_detail_extras" {
-  sql = <<-EOQ
   select
     accountables -> 'turbot' ->> 'id' as "id",
     workspace as "Workspace",
@@ -147,19 +131,23 @@ query "workspace_account_detail_extras" {
         when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/azure#/resource/types/subscription' then accountables -> 'data' ->> 'subscriptionId'
         when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/gcp#/resource/types/project' then accountables -> 'data' ->> 'projectId'
         when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/servicenow#/resource/types/instance' then accountables -> 'data' ->> 'instance_id'
-      end as "Account ID",
-    case
-      when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/aws#/resource/types/account' then accountables -> 'data' ->> 'AccountAlias'
-      when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/azure#/resource/types/subscription' then accountables -> 'data' ->> 'displayName'
-      when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/gcp#/resource/types/project' then accountables -> 'data' ->> 'name'
-      when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/servicenow#/resource/types/instance' then accountables -> 'data' ->> 'instance_id'
-    end as "Account Name",
-    accountables -> 'trunk' ->> 'title' as "Trunk",
-    accountables -> 'descendants' -> 'metadata' -> 'stats' ->> 'total' as "Resources",
-    accountables -> 'policySettings' -> 'metadata' -> 'stats' ->> 'total' as "Policy Settings",
-    accountables -> 'alerts' -> 'metadata' -> 'stats' ->> 'total' as "Alerts",
-    accountables -> 'activeControls' -> 'metadata' -> 'stats' ->> 'total' as "Active Controls",
-    accountables -> 'totalControls' -> 'metadata' -> 'stats' ->> 'total' as "Total Controls"
+      end as "External ID",
+      case
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/aws#/resource/types/account' then accountables -> 'data' ->> 'AccountAlias'
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/azure#/resource/types/subscription' then accountables -> 'data' ->> 'displayName'
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/gcp#/resource/types/project' then accountables -> 'data' ->> 'name'
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/servicenow#/resource/types/instance' then accountables -> 'data' ->> 'instance_id'
+      end as "External Name",
+      case
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/aws#/resource/types/account' then 'AWS'
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/azure#/resource/types/subscription' then 'Azure'
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/gcp#/resource/types/project' then 'GCP'
+        when accountables -> 'type' ->> 'uri' = 'tmod:@turbot/servicenow#/resource/types/instance' then 'ServiceNow'
+      end as "Provider",
+    (accountables -> 'descendants' -> 'metadata' -> 'stats' -> 'total')::int as "Resources",
+    (accountables -> 'policySettings' -> 'metadata' -> 'stats' ->> 'total')::int as "Policy Settings",
+    (accountables -> 'alerts' -> 'metadata' -> 'stats' ->> 'total')::int as "Alerts",
+    (accountables -> 'activeControls' -> 'metadata' -> 'stats' ->> 'total')::int as "Active Controls"
   from
     guardrails_query,
     jsonb_array_elements(output ->  'resources' -> 'items') as accountables
@@ -177,9 +165,6 @@ query "workspace_account_detail_extras" {
           data
           turbot {
             id
-          }
-          trunk {
-            title
           }
           type {
             uri
@@ -212,16 +197,9 @@ query "workspace_account_detail_extras" {
               }
             }
           }
-          totalControls: controls {
-            metadata {
-              stats {
-                total
-              }
-            }
-          }
         }
       }
     }'
-  order by "Workspace"
+  order by "Workspace", "Resources" desc
   EOQ
 }
