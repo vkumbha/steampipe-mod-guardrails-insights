@@ -482,11 +482,11 @@ query "policies_summary" {
   sql = <<-EOQ
   select
     workspace as "Workspace",
-    output ->  'ok' -> 'metadata' -> 'stats' -> 'total' as ok,
-    output ->  'tbd' -> 'metadata' -> 'stats' -> 'total' as tbd,
-    output ->  'invalid' -> 'metadata' -> 'stats' -> 'total' as invalid,
-    output ->  'error' -> 'metadata' -> 'stats' -> 'total' as error,
-    output ->  'total' -> 'metadata' -> 'stats' -> 'total' as total
+    (output ->  'ok' -> 'metadata' -> 'stats' -> 'total')::int as ok,
+    (output ->  'tbd' -> 'metadata' -> 'stats' -> 'total')::int as tbd,
+    (output ->  'invalid' -> 'metadata' -> 'stats' -> 'total')::int as invalid,
+    (output ->  'error' -> 'metadata' -> 'stats' -> 'total')::int as error,
+    (output ->  'total' -> 'metadata' -> 'stats' -> 'total')::int as total
   from
     guardrails_query
   where
