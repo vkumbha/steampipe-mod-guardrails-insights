@@ -88,38 +88,38 @@ dashboard "workspace_account_report" {
   }
 }
 
-query "workspace_aws_count" {
-  sql = <<-EOQ
-    select
-      count(resource_type_uri) as "AWS"
-    from
-      guardrails_resource
-    where
-      resource_type_uri = 'tmod:@turbot/aws#/resource/types/account';
-  EOQ
-}
+# query "workspace_aws_count" {
+#   sql = <<-EOQ
+#     select
+#       count(resource_type_uri) as "AWS"
+#     from
+#       guardrails_resource
+#     where
+#       resource_type_uri = 'tmod:@turbot/aws#/resource/types/account';
+#   EOQ
+# }
 
-query "workspace_azure_count" {
-  sql = <<-EOQ
-    select
-      count(resource_type_uri) as "Azure"
-    from
-      guardrails_resource
-    where
-      resource_type_uri = 'tmod:@turbot/azure#/resource/types/subscription';
-  EOQ
-}
+# query "workspace_azure_count" {
+#   sql = <<-EOQ
+#     select
+#       count(resource_type_uri) as "Azure"
+#     from
+#       guardrails_resource
+#     where
+#       resource_type_uri = 'tmod:@turbot/azure#/resource/types/subscription';
+#   EOQ
+# }
 
-query "workspace_gcp_count" {
-  sql = <<-EOQ
-    select
-      count(resource_type_uri) as "GCP"
-    from
-      guardrails_resource
-    where
-      resource_type_uri = 'tmod:@turbot/gcp#/resource/types/project';
-  EOQ
-}
+# query "workspace_gcp_count" {
+#   sql = <<-EOQ
+#     select
+#       count(resource_type_uri) as "GCP"
+#     from
+#       guardrails_resource
+#     where
+#       resource_type_uri = 'tmod:@turbot/gcp#/resource/types/project';
+#   EOQ
+# }
 
 query "workspace_account_detail" {
   sql = <<-EOQ

@@ -13,6 +13,7 @@ dashboard "workspace_report_admin" {
     card {
       sql   = query.workspaces_count.sql
       width = 2
+      href  = dashboard.workspace_report.url_path
     }
 
     card {
@@ -23,6 +24,7 @@ dashboard "workspace_report_admin" {
     card {
       sql   = query.accounts_total.sql
       width = 2
+      href  = dashboard.workspace_account_report.url_path
     }
 
     card {
@@ -293,7 +295,7 @@ dashboard "workspace_report_admin" {
   container {
     title = "Missing required minimum permissions for the AWS Role"
     text {
-      value = "The AWS Account CMDB is in eror state, this is most likely because the AWS IAM Role used to import the account does not have bare minimum permissions. The list is empty for healthy workspace(s)."
+      value = "The AWS Account CMDB is in eror state, this is most likely because the AWS IAM Role used to import the account does not have bare minimum permissions. Try running AccountCMDB control for confirmation. The list is empty for healthy workspace(s)."
     }
     table {
       column "id" {
@@ -649,7 +651,6 @@ query "missing_permissions_aws_account" {
     workspace as "Workspace",
     accounts -> 'turbot' ->> 'id' as id,
     accounts -> 'resource' ->> 'account_id' as "Account Id",
-    accounts -> 'resource' ->> 'account_alias' as "Account Alias",
     accounts ->> 'state'  as "State",
     accounts ->> 'reason'  as "Reason"
   from
@@ -668,7 +669,6 @@ query "missing_permissions_aws_account" {
         reason
         resource {
           account_id: get(path: "Id")
-          account_alias: get(path: "AccountAlias")
           turbot {
             id
           }
