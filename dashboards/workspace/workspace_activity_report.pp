@@ -41,6 +41,7 @@ control "guardrails_workspace_activity_retention" {
 query "guardrails_workspace_user_activity" {
   sql = <<-EOQ
     select
+        workspace,
         workspace as resource,
         CASE 
             WHEN count(
