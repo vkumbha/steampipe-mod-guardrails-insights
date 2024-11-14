@@ -11,6 +11,7 @@ benchmark "workspace_user_activity" {
     control.guardrails_workspace_mod_auto_update,
     control.guardrails_workspace_retention,
     control.guardrails_workspace_activity_retention,
+    control.guardrails_workspace_policy_conflicts,
   ]
 }
 
@@ -36,6 +37,12 @@ control "guardrails_workspace_activity_retention" {
   title       = "Turbot > Workspace > Retention > Activity Retention"
   description = "Check the policy values for guardrails workspace activity retention"
   query       = query.guardrails_activity_retention
+}
+
+control "guardrails_workspace_policy_conflicts" {
+  title       = "Turbot > Workspace > Policy Conflicts"
+  description = "Detect potential policy conflicts causing controls to loop repeatedly."
+  query       = query.guardrails_workspace_policy_conflicts
 }
 
 # query "guardrails_workspace_user_activity" {
@@ -197,5 +204,79 @@ query "guardrails_activity_retention" {
       AND ps.policy_type_uri = 'tmod:@turbot/turbot#/policy/types/activityRetention'
     ORDER BY
       ws.workspace;
+  EOQ
+}
+
+query "guardrails_workspace_policy_conflicts" {
+  sql = <<-EOQ
+SELECT
+    g.workspace,
+    g.workspace AS resource,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM (
+                SELECT
+                    notifications -> 'resource' -> 'type' ->> 'uri' AS resource_type,
+                    notifications ->> 'notificationType' AS notification_type,
+                    COUNT(*) AS notification_count
+                FROM
+                    jsonb_array_elements(g.output -> 'notifications' -> 'items') AS notifications
+                WHERE
+                    notifications ->> 'notificationType' IN ('resource_created', 'resource_deleted', 'resource_updated', 'control_notify')
+                GROUP BY
+                    resource_type, notification_type
+                HAVING
+                    COUNT(*) >= 10
+            ) sub
+        ) THEN 'alarm'
+        ELSE 'ok'
+    END AS status,
+    CASE
+        WHEN EXISTS (
+            SELECT 1
+            FROM (
+                SELECT
+                    notifications -> 'resource' -> 'type' ->> 'uri' AS resource_type,
+                    notifications ->> 'notificationType' AS notification_type,
+                    COUNT(*) AS notification_count
+                FROM
+                    jsonb_array_elements(g.output -> 'notifications' -> 'items') AS notifications
+                WHERE
+                    notifications ->> 'notificationType' IN ('resource_created', 'resource_deleted', 'resource_updated', 'control_notify')
+                GROUP BY
+                    resource_type, notification_type
+                HAVING
+                    COUNT(*) >= 10
+            ) sub
+        ) THEN 'Potential control conflicts detected in the last hour.'
+        ELSE 'No control conflicts detected.'
+    END AS reason
+FROM
+    guardrails_query g
+WHERE
+    g.query = '{
+      notifications: notifications(
+        filter: "timestamp:>=T-1h !controlTypeId:tmod:@turbot/turbot#/control/types/runnableMonitor,tmod:@turbot/turbot#/control/types/processMonitor,tmod:@turbot/turbot#/control/types/eventMonitor limit:5000"
+      ) {
+        items {
+          turbot {
+            id
+            createTimestamp
+          }
+          resource {
+            type {
+              uri
+            }
+          }
+          notificationType
+          control {
+            type {
+              uri
+            }
+          }
+        }
+      }
+    }';
   EOQ
 }
