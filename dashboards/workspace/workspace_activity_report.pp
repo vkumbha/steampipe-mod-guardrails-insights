@@ -38,17 +38,67 @@ control "guardrails_workspace_activity_retention" {
   query       = query.guardrails_activity_retention
 }
 
+# query "guardrails_workspace_user_activity" {
+#   sql = <<-EOQ
+#     SELECT
+#         g.workspace,
+#         g.workspace AS resource,
+#         CASE
+#             WHEN COUNT(n.notifications) = 0 THEN 'alarm'
+#             ELSE 'ok'
+#         END AS status,
+#         CASE
+#             WHEN COUNT(n.notifications) = 0 THEN 'Workspace is Inactive. No User Login for 30 Days.'
+#             ELSE 'Workspace is Active.'
+#         END AS reason
+#     FROM
+#         tmhcc.guardrails_query g
+#     LEFT JOIN LATERAL
+#         jsonb_array_elements(g.output -> 'notifications' -> 'items') AS n(notifications) ON TRUE
+#     WHERE
+#         g.query = '{
+#           notifications: resources(
+#             filter: "resourceTypeId:tmod:@turbot/turbot-iam#/resource/types/profile,tmod:@turbot/turbot-iam#/resource/types/groupProfile,tmod:@turbot/aws-iam#/resource/types/instanceProfile $.lastLoginTimestamp:>=T-30d"
+#           ) {
+#             items {
+#               lastLoginTimestamp: get(path: "lastLoginTimestamp")
+#               trunk {
+#                 title
+#               }
+#               turbot {
+#                 akas
+#               }
+#             }
+#           }
+#         }'
+#     GROUP BY
+#         g.workspace;
+#   EOQ
+# }
+
 query "guardrails_workspace_user_activity" {
   sql = <<-EOQ
     SELECT
         g.workspace,
         g.workspace AS resource,
-        CASE
-            WHEN COUNT(n.notifications) = 0 THEN 'alarm'
+        CASE 
+            WHEN COUNT(
+                CASE 
+                    WHEN (n.notifications ->> 'email') NOT LIKE '%@turbot.com' 
+                    THEN 1 
+                    ELSE NULL 
+                END
+            ) = 0 THEN 'alarm'
             ELSE 'ok'
         END AS status,
-        CASE
-            WHEN COUNT(n.notifications) = 0 THEN 'Workspace is Inactive. No User Login for 30 Days.'
+        CASE 
+            WHEN COUNT(
+                CASE 
+                    WHEN (n.notifications ->> 'email') NOT LIKE '%@turbot.com' 
+                    THEN 1 
+                    ELSE NULL 
+                END
+            ) = 0 THEN 'Workspace is Inactive. No User Login for 30 Days.'
             ELSE 'Workspace is Active.'
         END AS reason
     FROM
@@ -57,29 +107,26 @@ query "guardrails_workspace_user_activity" {
         jsonb_array_elements(g.output -> 'notifications' -> 'items') AS n(notifications) ON TRUE
     WHERE
         g.query = '{
-            notifications: notifications(
-                filter: [
-                    "resourceTypeId:tmod:@turbot/turbot-iam#/resource/types/profile !$.lastLoginTimestamp:null",
-                    "$.lastLoginTimestamp:>=T-30d sort:-updateTimestamp"
-                ]
-            ) {
-                items {
-                    resource {
-                        lastLoginTimestamp: get(path: "lastLoginTimestamp")
-                        trunk {
-                            title
-                        }
-                        turbot {
-                            akas
-                        }
-                    }
-                }
+          notifications: resources(
+            filter: "resourceTypeId:tmod:@turbot/turbot-iam#/resource/types/profile,tmod:@turbot/turbot-iam#/resource/types/groupProfile,tmod:@turbot/aws-iam#/resource/types/instanceProfile $.lastLoginTimestamp:>=T-30d"
+          ) {
+            items {
+              email: get(path:"email")
+              lastLoginTimestamp: get(path: "lastLoginTimestamp")
+              trunk {
+                title
+              }
+              turbot {
+                akas
+              }
             }
+          }
         }'
     GROUP BY
         g.workspace;
   EOQ
 }
+
 
 query "guardrails_mod_auto_update" {
   sql = <<-EOQ
