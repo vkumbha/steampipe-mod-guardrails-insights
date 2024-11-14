@@ -73,7 +73,7 @@ query "guardrails_workspace_user_activity" {
                     "resourceTypeId:tmod:@turbot/turbot-iam#/resource/types/profile",
                     "!$.lastLoginTimestamp:null",
                     "$.lastLoginTimestamp:<=T-30d",
-                    "sort:-updateTimestamp"
+                    "sort:updateTimestamp"
                 ]
             ) {
                 items {
