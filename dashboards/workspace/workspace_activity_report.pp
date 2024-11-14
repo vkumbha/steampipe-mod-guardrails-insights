@@ -40,40 +40,27 @@ control "guardrails_workspace_activity_retention" {
 
 query "guardrails_workspace_user_activity" {
   sql = <<-EOQ
-    select
-        workspace,
-        workspace as resource,
-        CASE 
-            WHEN count(
-                CASE 
-                    WHEN (notifications -> 'resource' -> 'turbot' -> 'akas') ->> 1 NOT LIKE '%@turbot.com' 
-                    THEN 1 
-                    ELSE NULL 
-                END
-            ) = 0 THEN 'alarm'
+    SELECT
+        g.workspace,
+        g.workspace AS resource,
+        CASE
+            WHEN COUNT(n.notifications) = 0 THEN 'alarm'
             ELSE 'ok'
-        END as status,
-        CASE 
-            WHEN count(
-                CASE 
-                    WHEN (notifications -> 'resource' -> 'turbot' -> 'akas') ->> 1 NOT LIKE '%@turbot.com' 
-                    THEN 1 
-                    ELSE NULL 
-                END
-            ) = 0 THEN 'Workspace is Inactive. No User Login for 30 Days.'
+        END AS status,
+        CASE
+            WHEN COUNT(n.notifications) = 0 THEN 'Workspace is Inactive. No User Login for 30 Days.'
             ELSE 'Workspace is Active.'
-        END as reason
-    from
-        guardrails_query,
-        jsonb_array_elements(output -> 'notifications' -> 'items') as notifications
-    where
-        query = '{
+        END AS reason
+    FROM
+        guardrails_query g
+    LEFT JOIN LATERAL
+        jsonb_array_elements(g.output -> 'notifications' -> 'items') AS n(notifications) ON TRUE
+    WHERE
+        g.query = '{
             notifications: notifications(
                 filter: [
-                    "resourceTypeId:tmod:@turbot/turbot-iam#/resource/types/profile",
-                    "!$.lastLoginTimestamp:null",
-                    "$.lastLoginTimestamp:<=T-30d",
-                    "sort:updateTimestamp"
+                    "resourceTypeId:tmod:@turbot/turbot-iam#/resource/types/profile !$.lastLoginTimestamp:null",
+                    "$.lastLoginTimestamp:>=T-30d sort:-updateTimestamp"
                 ]
             ) {
                 items {
@@ -89,7 +76,8 @@ query "guardrails_workspace_user_activity" {
                 }
             }
         }'
-    group by workspace;
+    GROUP BY
+        g.workspace;
   EOQ
 }
 
